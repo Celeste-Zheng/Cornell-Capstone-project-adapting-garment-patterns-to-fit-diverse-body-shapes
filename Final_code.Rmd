@@ -1,0 +1,2459 @@
+---
+title: "Enhancing Clothing Design through Anthropometric Data Analysis"
+author: "Lily Bharati Sharma (ls989), Xinru Zheng(xz844), Xuran Zhang(xz854), Yanan Zhang (yz2999), Yuze Gu (yg348) "
+date: "2024-05-12"
+output: html_document
+---
+## README
+
+# Tailored for Diversity: Adapting Garment Patterns to Fit Diverse Body Shapes
+
+This project leverages anthropometric data from the CAESAR database to enhance the design and fit of pants across diverse ethnic groups. By accurately analyzing body measurement patterns, particularly the lower torso, and utilizing machine learning techniques, our team aims to predict crotch curves and identify ethnicity-based differences. The research, sponsored by Dr. Fatma Baytar from Cornell University, uses a spline model for curve fitting and combines these features with traditional anthropometric variables to improve predictions of ethnicity and inform adjustments in garment patterns for better inclusivity and comfort.
+
+## Prerequisites
+Before you can run the examples provided, ensure you have the following R packages installed:
+```{r install_packages, eval=FALSE}
+install.packages("ggplot2")
+install.packages("dplyr")
+install.packages("readxl")
+install.packages("tidyr")
+install.packages("reshape2")
+install.packages("splines")
+install.packages("segmented")
+install.packages("MASS")
+install.packages("nnet")
+install.packages("caret")
+install.packages("pROC")
+install.packages("cluster")
+install.packages("gridExtra")
+install.packages("xgboost")
+install.packages("lightgbm")
+install.packages("adabag")
+install.packages("randomForest")
+install.packages("tidyverse")
+install.packages("openxlsx")
+library(openxlsx)
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(reshape2)
+library(MASS) 
+library(segmented)
+library(splines)
+library(nnet) 
+library(caret)  
+library(pROC)  
+library(cluster)
+library(xgboost)
+library(lightgbm)
+library(adabag)
+library(randomForest)
+library(gridExtra)
+library(tidyverse)
+```
+
+##Usage 
+To use this project's functionalities, you first need to install and load the necessary R package, then utilize the provided functions to analyze anthropometric data and predict crotch curves and ethnicity. 
+
+##Parameters 
+data: A data frame where each row represents an individual and columns represent their body measurements and race.
+output_results: A combination of both data and the spline model coefficients. 
+
+##Authors 
+Lily Bharati Sharma (ls989)
+Xinru Zheng(xz844)
+Xuran Zhang(xz854)
+Yanan Zhang (yz2999)
+Yuze Gu (yg348) 
+
+##Acknowledgments
+You might see some "Warning" while running the code, do not stop generating the code. You are on the right track. 
+
+```{r}
+#Raw data merge file
+
+#Asian data replace with appropriate Path
+# Replace the path appropriately
+
+zip_file_path_Asian <- "F:/Graduate/Project/AsianWaistXYpoints.zip"  # refer data AsianWaistXYpoints.zip
+csv_file_path_Asian <- "F:/Graduate/Project/AsianWaistXYpoints.csv"
+xlsx_file_path_Asian <-"F:/Graduate/Project/AsianWaist.xlsx"
+merged_output_Asian  <- "F:/Graduate/Project/merged_AsianWaist.xlsx"# path to output
+
+#Hispanic data replace with appropriate Path
+
+zip_file_path_hispanic <- "C:/Users/lilyb/OneDrive/Desktop/Project_capstone/HispanicWaistXYpoints.zip" 
+csv_file_path_hispanic <- "C:/Users/lilyb/OneDrive/Desktop/Project_capstone/HispanictXYpoints.csv"
+xlsx_file_path_hispanic <-"C:/Users/lilyb/OneDrive/Desktop/Project_capstone/Hispanic.xlsx"
+merged_output_hispanic <- "C:/Users/lilyb/OneDrive/Desktop/Project_capstone/" # path to output
+
+#White data replace with appropriate Path
+
+zip_file_path_White <- "F:/Graduate/Project/WhiteWaistXYpoints.zip" 
+csv_file_path_White <- "F:/Graduate/Project/WhiteWaistXYpoints.csv"
+xlsx_file_path_White <-"F:/Graduate/Project/WhiteWaist.xlsx"
+merged_output_White <- "/Users/zhangyanan/Desktop/Cornell/Spring 2024/STSCI" # path to output
+
+#AfricanAmer data replace with appropriate Path
+zip_file_path_AfricanAmerican <- "/Users/gracezhang/Desktop/AfricanAmerWaistXYpoints.zip" 
+csv_file_path_AfricanAmerican <- "/Users/gracezhang/Desktop/AfricanAmerWaistXYpoints.csv" 
+xlsx_file_path_AfricanAmerican <- "/Users/gracezhang/Desktop/AfricanAmerWaist.xlsx"
+merged_output_AfricanAmerican  <- "/Users/gracezhang/Desktop/merged_AfricanAmerWaist.xlsx
+5999/Dataset/OtherWaistXYpoints/merged_WhiteWaist.xlsx" # path to output
+ 
+
+#Other race data replace with appropriate Path
+
+zip_file_path_other <- "/Users/zhangyanan/Desktop/Cornell/Spring 2024/STSCI 
+5999/Dataset/OtherWaistXYpoints.zip" 
+
+csv_file_path_other <- "/Users/zhangyanan/Desktop/Cornell/Spring 2024/STSCI 
+5999/Dataset/OtherWaistXYpoints.csv"
+
+xlsx_file_path_other <- "/Users/zhangyanan/Desktop/Cornell/Spring 2024/STSCI 
+5999/Dataset/OtherWaistXYpoints.csv"
+
+merged_output_other <- "/Users/zhangyanan/Desktop/Cornell/Spring 2024/STSCI 
+5999/Dataset/OtherWaistXYpoints.csv"
+
+# Input path of the data
+# Specify the file path
+file_path <- "/Users/gracezhang/Desktop/STSCI5999/data.xlsx"  # Replace with the actual file path
+# Define the output directory
+output_dir <- "/Users/gracezhang/Desktop/STSCI5999/Data"
+
+# Define the output Excel file path
+output_excel <- "/Users/gracezhang/Desktop/STSCI5999/Data/output_results.xlsx"
+
+
+```
+
+## R Markdown
+
+# White Race original data merge with xy coordinates
+
+```{r} 
+
+unzip(zip_file_path_White) 
+ 
+file_list <- list.files(pattern = "*.txt") 
+ 
+df <- data.frame(File_Name = character(), Content = character(), stringsAsFactors = FALSE) 
+ 
+for (file_name in file_list) { 
+ content <- readLines(file_name, warn = FALSE) 
+ df <- rbind(df, data.frame(Subject = sub("^csr(.*)a\\.txt$", "\\1",file_name), Data_Points = 
+paste(content, collapse = "\n"), stringsAsFactors = FALSE)) 
+} 
+print(df) 
+ 
+``` 
+
+```{r} 
+#save in csv white data after merge
+write.csv(df, file = csv_file_path_White, row.names = FALSE) 
+ 
+``` 
+ 
+ 
+```{r} 
+
+ 
+csv_data <- read.csv(csv_file_path_White) #Read white csv file
+ 
+wb <- loadWorkbook(xlsx_file_path_White)  #load white xlsx file
+ 
+xlsx_data <- read.xlsx(wb) 
+ 
+merged_data <- merge(xlsx_data, csv_data, by.x = "Subject", by.y = "Subject", all.x = TRUE) 
+merged_data <- mutate(merged_data, race = 'White') 
+ 
+writeData(wb, sheet = "Sheet1", x = merged_data, startCol = 1, startRow = 1, colNames = 
+TRUE) 
+ 
+saveWorkbook(wb, xlsx_file_path_White)
+
+```
+
+
+#Other race data merge
+
+
+```{r} 
+
+ 
+unzip(zip_file_path_other) 
+ 
+file_list <- list.files(pattern = "*.txt") 
+ 
+df <- data.frame(File_Name = character(), Content = character(), stringsAsFactors = FALSE) 
+ 
+for (file_name in file_list) { 
+ content <- readLines(file_name, warn = FALSE) 
+ df <- rbind(df, data.frame(Subject = sub("^csr(.*)a\\.txt$", "\\1",file_name), Data_Points = 
+paste(content, collapse = "\n"), stringsAsFactors = FALSE)) 
+} 
+ 
+print(df) 
+
+ 
+write.csv(df, file = csv_file_path_other, row.names = FALSE) 
+
+
+csv_data <- read.csv(csv_file_path_other) 
+ 
+wb <- loadWorkbook(xlsx_file_path_other) 
+ 
+xlsx_data <- read.xlsx(wb) 
+ 
+merged_data <- merge(xlsx_data, csv_data, by.x = "Subject", by.y = "Subject", all.x = TRUE) 
+merged_data <- mutate(merged_data, race = 'Other') 
+ 
+writeData(wb, sheet = "Sheet1", x = merged_data, startCol = 1, startRow = 1, colNames = 
+TRUE) 
+
+saveWorkbook(wb,merged_output_other )
+
+```
+
+#Data merge code (AfricanAmerican) 
+```{r} 
+
+ 
+unzip(zip_file_path_AfricanAmerican) 
+ 
+file_list <- list.files(pattern = "*.txt") 
+ 
+df <- data.frame(File_Name = character(), Content = character(), stringsAsFactors = FALSE) 
+ 
+for (file_name in file_list) { 
+ content <- readLines(file_name, warn = FALSE) 
+ df <- rbind(df, data.frame(Subject = sub("^csr(.*)a\\.txt$", "\\1",file_name), Data_Points = 
+paste(content, collapse = "\n"), stringsAsFactors = FALSE)) 
+} 
+ 
+print(df) 
+ 
+
+write.csv(df, file = csv_file_path_AfricanAmerican, row.names = FALSE) 
+ 
+
+csv_data <- read.csv(csv_file_path_AfricanAmerican) 
+
+wb <- loadWorkbook(xlsx_file_path_AfricanAmerican) 
+ 
+xlsx_data <- read.xlsx(wb) 
+ 
+merged_data <- merge(xlsx_data, csv_data, by.x = "Subject", by.y = "Subject", all.x = TRUE) 
+merged_data <- mutate(merged_data, race = 'AfricanAmer') 
+ 
+writeData(wb, sheet = "Sheet1", x = merged_data, startCol = 1, startRow = 1, colNames = 
+TRUE) 
+ 
+saveWorkbook(wb, merged_output_AfricanAmerican  ) 
+ 
+``` 
+
+ 
+
+#	Data merge Code (Asian)
+```{r}
+ 
+ 
+unzip(zip_file_path)
+ 
+file_list <- list.files(pattern = "*.txt")
+ 
+df <- data.frame(File_Name = character(), Content = character(), stringsAsFactors = FALSE)
+ 
+for (file_name in file_list) {
+  content <- readLines(file_name, warn = FALSE)
+  df <- rbind(df, data.frame(Subject = sub("^csr(.*)a\\.txt$", "\\1",file_name), Data_Points = paste(content, collapse = "\n"), stringsAsFactors = FALSE))
+}
+ 
+print(df)
+ 
+```
+
+
+```{r}
+# creating CSV file of the data
+
+write.csv(df, file = csv_file_path, row.names = FALSE)
+ 
+```
+ 
+ 
+```{r}
+
+csv_data <- read.csv(csv_file_path_Asian)
+ 
+wb <- loadWorkbook(xlsx_file_path_Asian)
+ 
+xlsx_data <- read.xlsx(wb)
+ 
+merged_data <- merge(xlsx_data, csv_data, by.x = "Subject", by.y = "Subject", all.x = TRUE)
+merged_data <- mutate(merged_data, race = 'Asian')
+ 
+writeData(wb, sheet = "Sheet1", x = merged_data, startCol = 1, startRow = 1, colNames = TRUE)
+ 
+saveWorkbook(wb, merged_output_Asian)
+```
+
+#	Data merge code (Hispanic)
+## Data-coordinates of each subject appended for Hispanic race
+
+
+```{r} 
+
+ 
+unzip(zip_file_path_hispanic) 
+ 
+file_list <- list.files(pattern = "*.txt") 
+ 
+df <- data.frame(File_Name = character(), Content = character(), stringsAsFactors = FALSE) 
+ 
+for (file_name in file_list) { 
+ content <- readLines(file_name, warn = FALSE) 
+ df <- rbind(df, data.frame(Subject = sub("^csr(.*)a\\.txt$", "\\1",file_name), Data_Points = 
+paste(content, collapse = "\n"), stringsAsFactors = FALSE)) 
+} 
+ 
+print(df) 
+ 
+
+write.csv(df, file = csv_file_path_hispanic, row.names = FALSE) 
+ 
+
+csv_data <- read.csv(csv_file_path_hispanicn) 
+
+wb <- loadWorkbook(xlsx_file_path_hispanic) 
+ 
+xlsx_data <- read.xlsx(wb) 
+ 
+merged_data <- merge(xlsx_data, csv_data, by.x = "Subject", by.y = "Subject", all.x = TRUE) 
+merged_data <- mutate(merged_data, race = 'AfricanAmer') 
+ 
+writeData(wb, sheet = "Sheet1", x = merged_data, startCol = 1, startRow = 1, colNames = 
+TRUE) 
+ 
+saveWorkbook(wb, merged_output_hispanic  ) 
+ 
+```
+
+#	Data Merge all Race
+
+
+# combining all the Race data along with respecting x-y coordinate of Curve
+```{r}
+library(readxl)
+library(dplyr)
+
+file_paths <- c(merged_output_Asian, merged_output_Other,merged_output_AfricanAmerican, merged_output_White, merged_output_hispanic) # List of file paths
+dfs <- lapply(file_paths, read_excel) # Read each Excel file into a list of data frames
+```
+
+
+
+
+```{r}
+library(readxl)
+# Read the Excel file into a data frame
+df <- read_excel(file_path)
+
+# View the first few rows of the data frame
+head(df)
+
+# List names of variables
+variable_names <- names(df)
+
+# Print variable names
+print(variable_names)
+
+```
+
+## Summary
+```{r}
+#summary(df)
+
+library(dplyr)
+library(ggplot2)
+
+
+# Function to calculate summary statistics for a variable
+calc_summary <- function(x) {
+  c(Mean = mean(x, na.rm = TRUE),
+    Median = median(x, na.rm = TRUE),
+    Min = min(x, na.rm = TRUE),
+    Max = max(x, na.rm = TRUE))
+}
+
+# Apply the function to each numeric variable in the dataset
+numeric_vars <- Filter(is.numeric, df)
+summary_table <- summarise_if(numeric_vars, is.numeric, calc_summary)
+summary_table
+# Load the tibble package
+library(tibble)
+
+# Convert tibble to data frame
+summary_table <- as.data.frame(summary_table)
+
+# Add row names as a column
+summary_table <- rownames_to_column(summary_table, var = "Variable")
+
+# Print the summary table
+print(summary_table)
+
+#Histogram of each variable
+
+#hist(data$`Max-Hip`)
+
+# Set the width of the histogram bars
+bar_width <- 0.5
+
+# Iterate through each column in the dataframe
+for (col in names(df)) {
+  # Check if the column is numeric
+  if (is.numeric(df[[col]])) {
+    # Generate a histogram for numeric columns
+    hist(df[[col]], main = paste("Histogram of", col),
+         xlab = col, ylab = "Frequency",
+         col = "skyblue", width = bar_width)
+  } else {
+    # For non-numeric columns, you can skip or handle them differently
+    cat("Skipping non-numeric column:", col, "\n")
+  }
+}
+
+```
+#Percentage of each race
+```{r}
+
+
+
+
+# Calculate the percentage of each race
+race_percentage <- df %>%
+  group_by(race) %>%
+  summarise(count = n()) %>%
+  mutate(percentage = count / sum(count))
+
+# Plot the graph
+ggplot(race_percentage, aes(x = race, y = percentage, fill = race)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = scales::percent(percentage)), 
+            position = position_stack(vjust = 0.5), 
+            size = 3, color = "white") +  # Add text labels on bars
+  labs(title = "Percentage of Each Race",
+       x = "Race",
+       y = "Percentage") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  theme_minimal()
+
+
+```
+
+#BMI variable distribution by race
+```{r}
+
+library(dplyr)
+library(ggplot2)
+
+# Assuming 'data' is your dataset containing BMI and race variables
+
+# Round down BMI to zero decimal digits
+df$rounded_BMI <- floor(df$BMI)
+data_clean <- na.omit(df) # Remove rows with NA values
+frequency_table <- table(df$race, df$rounded_BMI)
+
+
+# View the frequency table
+print(frequency_table)
+# Group by race and BMI, calculate count and percentage
+data_summary <- df %>%
+  group_by(rounded_BMI, race) %>%
+  summarise(count = n()) %>%
+  group_by(rounded_BMI) %>%
+  mutate(percentage = count / sum(count) * 100)
+
+# Create 100% stacked bar plot
+ggplot(data_summary, aes(x = as.factor(rounded_BMI), y = percentage, fill = race)) +
+  geom_bar(stat = "identity", position = "fill") +
+  labs(title = "100% Stacked Bar Graph of BMI by Race",
+       x = "BMI",
+       y = "Percentage",
+       fill = "Race") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  theme_minimal()
+
+```
+
+
+#Height by Race
+```{r}
+
+# Plot the box plot with y-axis breaks at intervals of 50
+ggplot(df, aes(x = race, y = Height, fill = race)) +
+  geom_boxplot() +
+  labs(title = "Height by Race",
+       x = "Race",
+       y = "Height")  +  
+  theme_minimal() +
+  scale_y_continuous(breaks = seq(0, max(df$Height), by = 50)) # Set breaks at intervals of 50
+
+```
+#Depth by race
+```{r}
+
+library(ggplot2)
+
+# Remove missing values from the 'Anterior_posterior_Length' column
+clean_df <- na.omit(df$Depth )
+# Plot the box plot with y-axis breaks at intervals of 50
+ggplot(df, aes(x = race, y = Depth, fill = race)) +
+  geom_boxplot() +
+  labs(title = "Depth by Race",
+       x = "Race",
+       y = "Depth")  +  
+  theme_minimal() +
+  scale_y_continuous(breaks = seq(0, max(clean_df), by = 30)) # Set breaks at intervals of 50
+
+```
+
+#	Box plot by Race code-Over all view
+
+```{r}
+library(readxl)
+library(dplyr)
+library(ggplot2)
+ 
+# Step 1: Read the Excel file
+# data <- read_excel("data.xlsx")
+data <- df
+summary(data)
+
+
+ # You may need to adjust the column names to exactly match those in your dataset
+data_long <- data %>% 
+  pivot_longer(cols = c("Depth", 
+                        "Anterior-posterior.Length"
+                        , "Front.Crotch.(Left.side)", 
+                        "Back.Crotch.(Right.Side)"), 
+               names_to = "Measurement", 
+               values_to = "Value")
+ 
+data_stats <- data_long %>%
+  group_by(Measurement) %>%
+  summarise(Q1 = quantile(Value, 0.25, na.rm = TRUE),
+            Q3 = quantile(Value, 0.75, na.rm = TRUE),
+            IQR = Q3 - Q1,
+            Lower_Bound = Q1 - 1.5 * IQR,
+            Upper_Bound = Q3 + 1.5 * IQR)
+ 
+print(data_stats)
+ 
+ggplot(data_long, aes(x = Measurement, y = Value, fill = Measurement)) + 
+  geom_boxplot() + 
+  theme_minimal(base_size = 14) +  # Increase the base font size for all text
+  scale_fill_brewer(palette = "Set2") +  # Use a color palette that is clear and distinct
+  labs(title = "Boxplot of Various Measurements", y = "Value", x = "") +
+  theme(
+    plot.title = element_text(face = "bold", size = 12),           # Make the title bold and larger
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 14),  # Rotate X axis labels for better readability
+    axis.text.y = element_text(size = 14),                         # Increase Y axis text size
+    axis.title = element_text(size = 16),                          # Increase axis titles size
+    legend.position = "none",                                      # Remove legend if not needed
+    panel.grid.major.x = element_line(color = "grey80", size = 0.5),  # Add major grid lines for x
+    panel.grid.minor.x = element_blank(),                            # Remove minor grid lines for x
+    panel.spacing = unit(10, "lines"),                              # Adjust spacing between panels
+    plot.margin = unit(c(0.15, 0.15, 0.15, 0.15), "cm")                        # Adjust plot margins
+  )+
+  coord_flip()
+```
+
+#Outlier
+
+
+```{r}
+library(tidyr)
+library(ggplot2)
+ 
+data_long <- data %>%
+  pivot_longer(cols = c("Height", "Max.Hip", "Crotch.curve.length.at.back.waist"), 
+               names_to = "Measurement", 
+               values_to = "Value")
+ 
+data_stats <- data_long %>%
+  group_by(Measurement) %>%
+  summarise(Q1 = quantile(Value, 0.25, na.rm = TRUE),
+            Q3 = quantile(Value, 0.75, na.rm = TRUE),
+            IQR = Q3 - Q1,
+            Lower_Bound = Q1 - 1.5 * IQR,
+            Upper_Bound = Q3 + 1.5 * IQR)
+ 
+print(data_stats)
+ 
+# Assuming data_long has been created from your dataset as previously described
+ggplot(data_long, aes(x = Measurement, y = Value, fill = Measurement)) + 
+  geom_boxplot() + 
+  theme_minimal() + 
+  labs(title = "Boxplot of Various Measurements Across Individuals", y = "Value", x = "") +
+  theme(plot.title = element_text(face = "bold", size = 20),
+        axis.title.x = element_text(face = "bold", size = 14),
+        axis.title.y = element_text(face = "bold", size = 14),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+        axis.text.y = element_text(size = 12),
+        legend.position = "none",
+        panel.grid.major = element_line(color = "grey80", size = 0.5),
+        panel.grid.minor = element_blank()) +
+  coord_flip() +
+  scale_y_continuous(breaks = function(x) pretty(x, n = 20))  # Adjust n for more or less granularity
+
+```
+
+
+#	Correlation analysis -all the variables 
+```{r}
+
+# excel_data <- read_excel("/Users/zhangyanan/Desktop/Cornell/Spring 2024/STSCI 5999/data.xlsx")
+excel_data <- df
+ excel_data = select_if(excel_data, is.numeric)
+# Remove rows with any missing values
+clean_data <- na.omit(excel_data)
+ 
+# Step 3: Perform correlation analysis
+correlation_matrix <- cor(clean_data[-1])
+ 
+# View correlation matrix
+print(correlation_matrix)
+melted_corr <- melt(correlation_matrix)
+ 
+ggplot(melted_corr, aes(Var1, Var2, fill = value)) +
+    geom_tile() + 
+    geom_text(aes(label = sprintf("%.2f", value)), vjust = 1, color = "white", size = 3) +
+    scale_fill_gradient2(low = "white", high = "pink", mid = "blue", midpoint = 0, limit = c(-1, 1), space = "Lab", name="Correlation") +
+    theme_minimal() + 
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          axis.text.y = element_text(angle = 45, hjust = 1)) +
+    labs(title = "Correlation Matrix Heatmap", x = "Variables", y = "Variables")
+
+
+```
+
+
+# Crotch Curve Fitting code for all the subjects -Spline regression
+```{r}
+library(readxl)
+library(segmented)
+library(dplyr)
+library(splines)
+
+# Read the excel file
+excel_data <- df
+
+# Define the output directory
+#output_dir <- "C:/Users/lilyb/Box/Capstone_Proj_Internal_Team/Data"
+
+# Define the output Excel file path
+#output_excel <- "C:/Users/lilyb/Box/Capstone_Proj_Internal_Team/Data/output_results.xlsx"
+
+# Print rows with empty Data_Points column before deletion
+cat("Rows with empty Data_Points column before deletion:\n")
+print(excel_data[is.na(excel_data$Data_Points), c("Subject", "Data_Points")])
+
+# Filter out rows with empty Data_Points
+excel_data <- excel_data %>% filter(!is.na(Data_Points))
+
+# Print rows with empty Data_Points column after deletion
+cat("\nRows with empty Data_Points column after deletion:\n")
+print(excel_data[is.na(excel_data$Data_Points), c("Subject", "Data_Points")])
+
+
+
+
+# Define a function to process each row
+process_row <- function(row, row_number) {
+  data <- as.character(row$Data_Points)
+  
+  lines <- strsplit(data, "\n", fixed = TRUE)[[1]]
+  
+  x_values <- numeric()
+  y_values <- numeric()
+  
+  for (line in lines) {
+    values <- strsplit(line, ",")[[1]]
+    x_values <- c(x_values, as.numeric(values[1]))
+    y_values <- c(y_values, as.numeric(values[2]))
+  }
+  
+  df <- data.frame(x = x_values, y = y_values)
+  
+  #df$y <- df$y*-1
+  if (any(df$y < 0)) {
+  df$y <- df$y
+} else {
+  df$y <- df$y * -1
+}
+  
+  max_index <- which.max(df$x)
+  min_index <- which.min(df$x)
+  max_point <- df[max_index, ]
+  min_point <- df[min_index, ]
+  
+  df2 <- df[df$y < min(df$y[max_index], df$y[min_index]), ]
+  
+  lm.mod <- lm(y ~ x, data = df2)
+
+
+start1 = ((min(df2$x)+max(df2$x))/2 + min(df2$x))/2
+start2 = ((min(df2$x)+max(df2$x))/2 + max(df2$x))/2
+
+#Segmented regression
+model.segmented2 <- segmented(lm.mod, seg.Z = ~x, psi = c(start1,start2), control = seg.control(quant = TRUE, display = FALSE))
+
+
+  #Extract first & second breakpoints value estimated by segmented regression
+  psi1 <- model.segmented2$psi[1, 2] 
+  psi2 <- model.segmented2$psi[2, 2]
+  
+  # extract data points which is middle portion i.e between first cutoff psi1 and psi2
+  
+  middle <- df2[df2$x > psi1 & df2$x < psi2, ] 
+  
+  # Find all the data points which is not middle datapoints
+  
+  points_only_in_df <- anti_join(df, middle, by = c("x", "y"))
+  
+  #Using k-mean sepearte the left and right part of the curve
+  k <- 2
+  set.seed(123)
+  kmeans_result <- kmeans(points_only_in_df, centers = k)
+  cluster_assignments <- kmeans_result$cluster
+  Left <- points_only_in_df[cluster_assignments == 1, ]
+  Right <- points_only_in_df[cluster_assignments == 2, ]
+  
+  #Fitting a spline model of degree 4 to the data. Using Basis Spline Transformation (bs) of x (predictor variable with degree of 4) to capture or fit non-linear relationship
+  
+  fit_middle <- lm(y ~ bs(x, degree = 2), data = middle)
+  fit_left <- lm(x ~ bs(y, degree = 3), data = Left)
+  fit_right <- lm(x ~ bs(y, degree = 3), data = Right)
+  
+  coef_middle <- as.data.frame(t(coef(fit_middle)))
+  colnames(coef_middle) <- c('Mid_I', 'Mid_D1', 'Mid_D2')
+  coef_left <- as.data.frame(t(coef(fit_left)))
+  colnames(coef_left) <- c('Left_I', 'Left_D1', 'Left_D2', 'Left_D3')
+  coef_right <- as.data.frame(t(coef(fit_right)))
+  colnames(coef_right) <- c('Right_I','Right_D1', 'Right_D2', 'Right_D3')
+  
+  df_coef <- data.frame(coef_left, coef_middle, coef_right)
+  
+  # For plot
+    # Get the row number
+  #row_number <- as.numeric(rownames(row))
+
+  # Extract the subject from the test_data dataframe
+  subject <- as.character(row$Subject)
+  
+  # Plot the original data
+  plot(df$x, df$y, main = paste("Spline Fit to Data - Row:", row_number, ", Subject:", subject))
+  
+  # Add the spline curve
+  y.range_left <- range(Left$y)
+  y.seq_left <- seq(from = y.range_left[2], to = y.range_left[1], by = -0.1)
+  predict_left <- data.frame(x = predict(fit_left, data.frame(y = y.seq_left)), y = y.seq_left)
+  
+  y.range_right <- range(Right$y)
+  y.seq_right <- seq(from = y.range_right[1], to = y.range_right[2], by = 0.1)
+  predict_right <- data.frame(x = predict(fit_right, data.frame(y = y.seq_right)), y = y.seq_right)
+  
+  x.seq_middle <- seq(from = tail(predict_left$x, 1), to = head(predict_right$x, 1))
+  predict_middle <- data.frame(x = x.seq_middle, y = predict(fit_middle, data.frame(x = x.seq_middle)))
+  
+  lines(x.seq_middle, predict(fit_middle, data.frame(x = x.seq_middle)), col = 'blue')
+  lines(predict(fit_left, data.frame(y = y.seq_left)), y.seq_left, col = 'red')
+  lines(predict(fit_right, data.frame(y = y.seq_right)), y.seq_right, col = 'green')
+  
+  predict_df <- rbind(predict_left, predict_middle, predict_right)
+  
+  return(list(df_coef = df_coef, predict_df = predict_df))
+}
+
+```
+
+```{r}
+# Apply the function to each row of the dataframe
+output_list <- mapply(process_row, row = split(excel_data, seq_len(nrow(excel_data))), row_number = seq_len(nrow(excel_data)), SIMPLIFY = FALSE)
+
+# Extract the results
+df_coef_list <- lapply(output_list, function(x) x$df_coef)
+predict_df_list <- lapply(output_list, function(x) x$predict_df)
+```
+
+```{r}
+library(openxlsx)
+
+# Initialize empty lists to store df_coef and predict_df
+df_coef_combined <- list()
+# predict_df_combined <- list()
+
+# Iterate through the output_list
+for (i in seq_along(output_list)) {
+  # Extract the current df_coef and predict_df
+  df_coef <- output_list[[i]]$df_coef
+  
+  # Add subject column to df_coef
+  df_coef$Subject <- excel_data$Subject[i]
+
+
+  # Merge with original data to include all columns
+  #df_coef <- merge(df_coef, excel_data, by.x = "Subject", by.y = "Subject", all.x = TRUE)
+ 
+  df_coef <- merge(df_coef, excel_data, by = "Subject", all.x = TRUE, suffixes = c("", ""))
+  # Append to combined lists
+  df_coef_combined[[i]] <- df_coef
+ 
+}
+
+# Combine all df_coef dataframes into one dataframe
+df_coef_combined <- do.call(rbind, df_coef_combined)
+
+
+```
+
+```{r}
+# Write to Excel file
+write.xlsx(list(df_coef_combined = df_coef_combined), 
+           file = output_excel)
+```
+
+## MANOVA R code
+```{r}
+library(readxl)
+#data <- read_excel("/Users/zhangyanan/Desktop/Cornell/Spring 2024/STSCI 5999/output_results.xlsx")
+data <- read_excel(output_excel)
+```
+ 
+```{r}
+# Select only the relevant columns for the MANOVA
+data_selected <- data[c("Left_I", "Left_D1", "Left_D2", "Left_D3", "Mid_I", "Mid_D1", "Mid_D2", "Right_I", "Right_D1", "Right_D2", "Right_D3", "race")]
+ 
+data_selected$race <- as.factor(data_selected$race)
+ 
+# Perform MANOVA using race as the independent variable
+manova_results <- manova(cbind(Left_I, Left_D1, Left_D2, Left_D3, Mid_I, Mid_D1, Mid_D2, Right_I, Right_D1, Right_D2, Right_D3) ~ race, data = data_selected)
+summary(manova_results)
+#Based on a small p-value, there are statistically significant differences in the multivariate means of the dependent variables ( like Left_I, Left_D1, etc.) across the different race groups
+```
+
+```{r}
+#Purpose: to identify which specific race groups differ from each other
+
+library(MASS)  # Load MASS for statistical functions
+ 
+ 
+data$race <- as.factor(data$race)
+ 
+# Exclude "Hispanic" and "Other" from the race factor
+data_filtered <- data[!data$race %in% c("Hispanic", "Other"),]
+ 
+# Remove rows with any NA values in the columns of interest
+data_filtered <- na.omit(data_filtered[, c('Left_I', 'Left_D1', 'Left_D2', 'Left_D3', 'race')])
+ 
+# Function to perform pairwise MANOVA with added checks
+pairwise_manova <- function(data, response_cols, group_col) {
+  levels <- levels(data[[group_col]])
+  combinations <- combn(levels, 2, simplify = FALSE)
+  results <- list()
+  
+  for (pair in combinations) {
+    # Filter data for the current pair of groups
+    sub_data <- data[data[[group_col]] %in% pair, ]
+ 
+    # Relevel the factor to drop unused levels
+    sub_data[[group_col]] <- factor(sub_data[[group_col]])
+ 
+    # Ensure we have more than one level in the group factor
+    if(length(unique(sub_data[[group_col]])) < 2) {
+      results[[paste(pair, collapse = " vs ")]] <- 'Insufficient data for MANOVA'
+      next
+    }
+ 
+    # Extract response variables and corresponding group factor
+    response_data <- sub_data[, response_cols]
+    group_factor <- sub_data[[group_col]]
+    
+    # Fit MANOVA
+    if(any(colSums(is.na(response_data)) > 0)) {
+      results[[paste(pair, collapse = " vs ")]] <- 'Data contains NAs'
+    } else {
+      manova_result <- manova(as.matrix(response_data) ~ group_factor)
+      summary_result <- summary(manova_result, test = "Pillai")
+      results[[paste(pair, collapse = " vs ")]] <- summary_result
+    }
+  }
+  
+  return(results)
+}
+ 
+# Execute the pairwise MANOVA
+results <- pairwise_manova(data_filtered, c('Left_I', 'Left_D1', 'Left_D2', 'Left_D3'), 'race')
+print(results)
+
+
+# Check if all expected columns are present
+expected_cols <- c('Mid_I', 'Mid_D1', 'Mid_D2', 'Right_I', 'Right_D1', 'Right_D2', 'Right_D3', 'race')
+missing_cols <- setdiff(expected_cols, names(data))
+ 
+if(length(missing_cols) > 0) {
+  stop("The following expected columns are missing: ", paste(missing_cols, collapse=", "))
+}
+ 
+# Continue with the existing columns
+data_filtered <- data[!data$race %in% c("Hispanic", "Other"),]
+data_filtered <- na.omit(data_filtered[, expected_cols])
+ 
+# Function to perform pairwise MANOVA with added checks
+pairwise_manova <- function(data, response_cols, group_col) {
+  levels <- levels(data[[group_col]])
+  combinations <- combn(levels, 2, simplify = FALSE)
+  results <- list()
+  
+  for (pair in combinations) {
+    # Filter data for the current pair of groups
+    sub_data <- data[data[[group_col]] %in% pair, ]
+    sub_data[[group_col]] <- factor(sub_data[[group_col]])  
+ 
+    # Ensure there are more than one level
+    if(length(unique(sub_data[[group_col]])) < 2) {
+      results[[paste(pair, collapse = " vs ")]] <- 'Insufficient data for MANOVA'
+      next
+    }
+ 
+    response_data <- sub_data[, response_cols]
+    group_factor <- sub_data[[group_col]]
+    
+    if(any(colSums(is.na(response_data)) > 0)) {
+      results[[paste(pair, collapse = " vs ")]] <- 'Data contains NAs'
+    } else {
+      manova_result <- manova(as.matrix(response_data) ~ group_factor)
+      summary_result <- summary(manova_result, test = "Pillai")
+      results[[paste(pair, collapse = " vs ")]] <- summary_result
+    }
+  }
+  
+  return(results)
+}
+ 
+# Execute the pairwise MANOVA for Middle and Right parts
+middle_results <- pairwise_manova(data_filtered, c('Mid_I', 'Mid_D1', 'Mid_D2'), 'race')
+right_results <- pairwise_manova(data_filtered, c('Right_I', 'Right_D1', 'Right_D2', 'Right_D3'), 'race')
+ 
+# Print results
+print("Middle Part Results:")
+print(middle_results)
+ 
+print("Right Part Results:")
+print(right_results)
+```
+
+
+```{r}
+output_excel <- "/Users/gracezhang/Desktop/STSCI5999/output_results.xlsx"
+df <- read_excel(output_excel)
+
+
+```
+
+
+#logisttic regressoin 
+```{r}
+library(nnet)  
+library(readxl) 
+library(caret)  
+library(pROC)  
+library(dplyr) 
+ 
+
+df <- read_excel(output_excel)
+df <- df %>%
+  
+  ## Both
+    select(-c(Subject, Comments, Data_Points, Curve)) %>%
+  ##Coefficient
+    #select(c( Left_I, Left_D1, Left_D2, Left_D3, Mid_I, Mid_D1, Mid_D2,  Right_I, Right_D1, Right_D2, Right_D3, race))%>%
+  
+  
+  ##Numeric 
+    #select(c( BMI, Max.Hip, Height, `Anterior-posterior.Length`, Depth,
+              #Crotch.curve.length.at.back.waist, `Front.Crotch.(Left.side)`, `Back.Crotch.(Right.Side)`, race))%>%
+
+
+  filter(race %in% c("White", "AfricanAmer", "Asian")) %>%  # Include only the races of interest
+    na.omit()
+ 
+ 
+df$race <- factor(df$race, levels = c("White", "AfricanAmer", "Asian"))
+ 
+numeric_cols <- sapply(df, is.numeric)
+df[numeric_cols] <- scale(df[numeric_cols])
+ 
+# Split data into training and testing sets
+set.seed(123)
+train_indices <- createDataPartition(df$race, p = 0.8, list = FALSE)
+train_data <- df[train_indices, ]
+test_data <- df[-train_indices, ]
+ 
+# Fit a multinomial logistic regression model
+model_multinom <- multinom(race ~ ., data = train_data)
+ 
+ 
+predicted_class <- predict(model_multinom, newdata = test_data, type = "class")
+predicted_probs <- predict(model_multinom, newdata = test_data, type = "probs")
+conf_mat <- confusionMatrix(predicted_class, test_data$race)
+print(conf_mat)
+cat("Accuracy Before Stepwise:", conf_mat$overall['Accuracy'], "\n")
+ 
+ 
+# ROC curve and AUC calculation for each class
+# Get predicted probabilities for each class
+race_categories_both <- levels(test_data$race)
+roc_list_both <- list()
+auc_list <- list()
+colors <- c("red", "green", "blue")  # Colors for each race category
+par(pin = c(4, 4), mai = c(1, 1, 0.5, 0.5))
+# Calculate ROC curve and AUC for each race
+for (i in 1:length(race_categories_both)) {
+    response_both <- ifelse(test_data$race == race_categories_both[i], 1, 0)
+    roc_obj_both <- roc(response_both, predicted_probs[, i])
+    roc_list_both[[i]] <- roc_obj_both
+    auc_list [[i]] <- auc(roc_obj_both)
+}
+colors <- c("red", "green", "blue")  # Colors for each race
+for (i in seq_along(levels(test_data$race))) {
+    truth <- ifelse(test_data$race == levels(test_data$race)[i], 1, 0)
+    roc_obj <- roc(truth, predicted_probs[, i])
+    auc_list[[levels(test_data$race)[i]]] <- auc(roc_obj)
+    plot(roc_obj, main = paste("ROC for", levels(test_data$race)[i]), col = colors[i], lwd = 2, print.auc = TRUE)
+    cat("AUC for", levels(test_data$race)[i], ":", auc(roc_obj), "\n")
+}
+par(mfrow = c(1, 1))  
+ 
+print(summary(model_multinom))
+ 
+ 
+```
+
+## Cluster analysis on white Data
+
+```{r}
+###If is imbalanced: randomly select 100 data from White to match the amount of data in Asian and AfrianAmer
+library(nnet) 
+library(readxl) 
+library(caret)  
+library(pROC)  
+library(dplyr)
+ 
+#df <- read_excel("/Users/gracezhang/Desktop/STSCI5999/output_results.xlsx")
+df <-  read_excel(output_excel)
+df <- df %>%
+  
+  ##Both
+  select(-c(Subject, Comments, Data_Points, Curve))
+  
+  ##Coefficient
+  #select(c( Left_I, Left_D1, Left_D2, Left_D3, Mid_I, Mid_D1, Mid_D2,  Right_I, Right_D1, Right_D2, Right_D3, race))
+  
+  ##Numeric 
+    #select(c( BMI, Max.Hip, Height, `Anterior-posterior.Length`, Depth,
+              #Crotch.curve.length.at.back.waist, `Front.Crotch.(Left.side)`, `Back.Crotch.(Right.Side)`, race))
+    
+df_filtered <- df %>%
+  filter(race %in% c("AfricanAmer", "Asian")) %>%
+  bind_rows(
+    df %>%
+      filter(race == "White") %>%
+      sample_n(100)
+  ) %>%
+    na.omit()
+ 
+ 
+df$race <- factor(df$race, levels = c("White", "AfricanAmer", "Asian"))
+ 
+numeric_cols <- sapply(df, is.numeric)
+df[numeric_cols] <- scale(df[numeric_cols])
+ 
+set.seed(123)
+train_indices <- createDataPartition(df$race, p = 0.8, list = FALSE)
+train_data <- df[train_indices, ]
+test_data <- df[-train_indices, ]
+ 
+model_multinom <- multinom(race ~ ., data = train_data)
+ 
+predicted_class <- predict(model_multinom, newdata = test_data, type = "class")
+predicted_probs <- predict(model_multinom, newdata = test_data, type = "probs")
+ 
+conf_mat <- confusionMatrix(predicted_class, test_data$race)
+print(conf_mat)
+cat("Accuracy Before Stepwise:", conf_mat$overall['Accuracy'], "\n")
+ 
+ 
+# ROC curve and AUC calculation for each class
+# Get predicted probabilities for each class
+race_categories_both <- levels(test_data$race)
+roc_list_both <- list()
+auc_list <- list()
+colors <- c("red", "green", "blue")  
+par(pin = c(4, 4), mai = c(1, 1, 0.5, 0.5))
+# Calculate ROC curve and AUC for each race
+for (i in 1:length(race_categories_both)) {
+    response_both <- ifelse(test_data$race == race_categories_both[i], 1, 0)
+    roc_obj_both <- roc(response_both, predicted_probs[, i])
+    roc_list_both[[i]] <- roc_obj_both
+    auc_list [[i]] <- auc(roc_obj_both)
+}
+colors <- c("red", "green", "blue")  
+for (i in seq_along(levels(test_data$race))) {
+    truth <- ifelse(test_data$race == levels(test_data$race)[i], 1, 0)
+    roc_obj <- roc(truth, predicted_probs[, i])
+    auc_list[[levels(test_data$race)[i]]] <- auc(roc_obj)
+    plot(roc_obj, main = paste("ROC for", levels(test_data$race)[i]), col = colors[i], lwd = 2, print.auc = TRUE)
+    cat("AUC for", levels(test_data$race)[i], ":", auc(roc_obj), "\n")
+}
+par(mfrow = c(1, 1))  
+ 
+ 
+print(summary(model_multinom))
+```
+ 
+ 
+```{r}
+## Use k-means to cluster White data, see if it vary 
+
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(cluster)
+#df <- read_excel("/Users/gracezhang/Desktop/STSCI5999/output_results.xlsx")
+df <- read_excel(output_excel)
+df_white <- df %>%
+  filter(race == "White") %>%
+  select(-race, -Subject, -Comments, -Data_Points, -Curve) 
+ 
+df_white <- na.omit(df_white)  
+df_white <- df_white[complete.cases(df_white), ]  
+df_white <- df_white[!apply(df_white, 1, function(x) any(is.infinite(x))), ] 
+ 
+df_white_scaled <- scale(df_white)
+ 
+set.seed(123)
+wss <- sapply(1:10, function(k){kmeans(df_white_scaled, centers = k, nstart = 25)$tot.withinss})
+plot(1:10, wss, type = "b", pch = 19, frame = FALSE, xlab = "Number of clusters K", ylab = "Total within-clusters sum of squares")
+ 
+set.seed(123)
+k <- 2 
+km_res <- kmeans(df_white_scaled, centers = k, nstart = 25)
+ 
+ 
+df_white$cluster <- as.factor(km_res$cluster)
+pca_res <- prcomp(df_white_scaled, scale. = TRUE)
+ 
+pca_data <- data.frame(PC1 = pca_res$x[, 1], PC2 = pca_res$x[, 2], Cluster = km_res$cluster)
+ 
+ggplot(pca_data, aes(x = PC1, y = PC2, color = as.factor(Cluster))) +
+    geom_point(alpha = 0.6, size = 2) +
+    scale_color_manual(values = c("#00AFBB", "#E7B800")) +
+    theme_minimal() +
+    labs(color = "Cluster") +
+    ggtitle("PCA and Clustering Results")
+ 
+ 
+```
+ 
+```{r}
+## logistic for both
+
+#df <- read_excel("/Users/gracezhang/Desktop/STSCI5999/output_results.xlsx")
+df <- read_excel(output_excel)
+
+df_white$race <- "White"
+ 
+other_races_data <- df %>%
+  filter(race %in% c("AfricanAmer", "Asian")) %>%
+  select(-Subject, -Comments, -Data_Points, -Curve) %>%
+  na.omit()
+ 
+set.seed(123)  
+sampled_data <- df_white %>%
+  filter(cluster == 1) %>%
+  sample_n(100) %>%
+  select(-cluster) 
+ 
+df <- bind_rows(sampled_data, other_races_data)
+df$race <- factor(df$race, levels = c("White", "AfricanAmer", "Asian"))
+ 
+numeric_cols <- sapply(df, is.numeric)
+df[numeric_cols] <- scale(df[numeric_cols])
+ 
+ 
+set.seed(123)
+train_indices <- createDataPartition(df$race, p = 0.8, list = FALSE)
+train_data <- df[train_indices, ]
+test_data <- df[-train_indices, ]
+ 
+model_multinom <- multinom(race ~ ., data = train_data)
+ 
+ 
+ 
+predicted_class <- predict(model_multinom, newdata = test_data, type = "class")
+predicted_class <- factor(predicted_class, levels = levels(test_data$race))
+ 
+conf_mat <- confusionMatrix(predicted_class, test_data$race)
+print(conf_mat)
+cat("Accuracy:", conf_mat$overall['Accuracy'], "\n")
+ 
+# ROC curve and AUC calculation for each class
+race_categories <- levels(test_data$race)
+predicted_probs <- predict(model_multinom, newdata = test_data, type = "probs")
+colors <- c("red", "green", "blue")  # Colors for each race category
+par(mfrow = c(1, length(race_categories)), mai = c(1, 1, 0.5, 0.5))
+ 
+for (i in seq_along(race_categories)) {
+    response <- ifelse(test_data$race == race_categories[i], 1, 0)
+    roc_obj <- roc(response, predicted_probs[, i])
+    plot(roc_obj, main = paste("ROC for", race_categories[i]), col = colors[i], lwd = 2, print.auc = TRUE)
+    cat("AUC for", race_categories[i], ":", auc(roc_obj), "\n")
+}
+par(mfrow = c(4, 4))  
+ 
+print(summary(model_multinom))
+ 
+```
+## Density plot only white data -variation check
+```{r}
+library(nnet)
+library(MASS)
+library(readxl)
+library(caret)
+library(pROC)
+library(dplyr)
+
+#df <- read_excel("C:/Users/lilyb/Box/Capstone_Proj_Internal_Team/Data/output_results.xlsx")
+df <- read_excel(output_excel)
+
+#Exclude unnecessary columns (e.g., comments, data points, curve)
+df <- select(df, -c(Comments, Data_Points, Curve))
+
+# Exclude 'Other' and 'Hispanic' from the race column
+df <- filter(df, !race %in% c("Other", "Hispanic"))
+
+# Convert 'race' to a factor
+df$race <- as.factor(df$race)
+
+# Check for NA values and remove or impute
+df <- na.omit(df)  # Removes all rows with any NA values
+# Normalize only numeric columns
+numeric_cols <- sapply(df, is.numeric)
+df_normalized <- as.data.frame(lapply(df[, numeric_cols], function(x) (x - min(x)) / (max(x) - min(x))))
+
+
+# # Find non-numeric columns
+# non_numeric_cols <- !numeric_cols
+# 
+# # Print non-numeric columns
+# non_numeric_names <- names(df)[non_numeric_cols]
+# print(non_numeric_names)
+
+# 
+# # Print numeric columns
+# non_numeric_names <- names(df)[numeric_cols]
+# print(non_numeric_names)
+
+
+# Combine normalized numeric columns with non-numeric columns
+df_normalized <- cbind(df[, !numeric_cols], df_normalized)
+
+# Separate predictors (X) and target variable (Y)
+X <- df_normalized[, 2:ncol(df_normalized)]  # Exclude the first column (race)
+Y <- df_normalized[, 1]
+
+
+set.seed(123)
+# Filter the data for only White, Asian, and AfricanAmer races
+filtered_data <- df
+filtered_data$race <- as.factor(df$race)
+
+train_indices <- createDataPartition(filtered_data$race, p = 0.8, list = FALSE)
+train_data <- filtered_data[train_indices, ]
+test_data <- filtered_data[-train_indices, ]
+
+train_data$race <- relevel(train_data$race, ref = "White")
+# train_data_last <- names(train_data)
+# print(train_data_last)
+
+```
+
+```{r}
+# Plots to see distrubution of each feature in subcategory of Race (white and AfricanAmerican)
+
+# Load necessary libraries 
+if (!require(ggplot2)) {
+  install.packages("ggplot2")
+}
+if (!require(gridExtra)) {
+  install.packages("gridExtra")
+}
+library(ggplot2)
+library(gridExtra)
+
+# Function to plot histograms or density plots for each variable
+plot_variable <- function(data_white, data_african_american, variable, race_label) {
+  p1 <- ggplot() +
+    geom_histogram(data = data_white, aes(x = !!sym(variable), fill = "White"), color = "white", bins = 30) +
+    geom_histogram(data = data_african_american, aes(x = !!sym(variable), fill = "African American"), color = "white", bins = 30) +
+    labs(title = paste("Histogram for", variable, "(", race_label, ")"), x = variable, y = "Frequency") +
+    scale_fill_manual(values = c("White" = "lightblue", "African American" = "lightgreen"))
+
+  p2 <- ggplot() +
+    geom_density(data = data_white, aes(x = !!sym(variable), fill = "White"), color = "blue") +
+    geom_density(data = data_african_american, aes(x = !!sym(variable), fill = "African American"), color = "darkgreen") +
+    labs(title = paste("Density Plot for", variable, "(", race_label, ")"), x = variable, y = "Density") +
+    scale_fill_manual(values = c("White" = "lightblue", "African American" = "lightgreen"))
+  
+  return(list(p1, p2))
+}
+
+# List of variables excluding the "race" variable
+variables <- setdiff(names(df), "race")
+
+# Subset the data for "White" and "African American" categories
+df_white <- subset(df, race == "White")
+df_african_american <- subset(df, race == "AfricanAmer")
+
+# Plot histograms and density plots for each variable separately for white and African American races
+for (var in variables) {
+  p <- plot_variable(df_white, df_african_american, var, "White vs African American")
+  grid.arrange(p[[1]], p[[2]], nrow = 2, top = paste("Variable:", var))
+}
+```
+
+# Ml model for Numeric Coeff
+```{r}
+library(readxl)
+library(caret)
+library(xgboost)
+#library(catboost)
+library(lightgbm)
+library(adabag)
+library(pROC)
+```
+
+
+```{r}
+# Load required libraries
+library(randomForest)
+library(caret)
+library(pROC)
+
+# data <- read_excel("F:/Graduate/Project/output_results.xlsx")
+
+library(readxl)
+# Read the data from Excel
+#data <- read_excel("F:/Graduate/Project/output_results.xlsx")
+data <- read_excel(output_excel)
+
+# Exclude "Hispanic" and "Other" from race
+data <- subset(data, race != "Hispanic" & race != "Other")
+
+# Convert race to factor
+data$race <- factor(data$race, levels = c("White", "Asian", "AfricanAmer"))
+
+# Select relevant columns and remove missing values
+df <- data[, c(1:20, 24)]
+df <- na.omit(df)
+
+# Normalize only numeric columns
+numeric_cols <- sapply(df, is.numeric)
+df_normalized <- as.data.frame(lapply(df[, numeric_cols], function(x) (x - min(x)) / (max(x) - min(x))))
+
+# Combine normalized numeric columns with non-numeric columns
+df_normalized <- cbind(df[, !numeric_cols], df_normalized)
+
+# Separate predictors (X) and target variable (Y)
+X <- df_normalized[, 2:ncol(df_normalized)]  # Exclude the first column (race)
+Y <- df_normalized[, 1]
+
+# Set seed for reproducibility
+set.seed(123)
+
+# Create indices for the training set
+trainIndex <- sample(1:nrow(df), size = 0.8 * nrow(df))
+
+# Split the data into training and testing sets
+train_X <- X[trainIndex, ]
+test_X <- X[-trainIndex, ]
+train_Y <- Y[trainIndex]  # Corrected indexing
+test_Y <- Y[-trainIndex]  # Corrected indexing
+
+# Check the number of rows in each set
+nrow(train_X)
+nrow(test_X)
+
+# Combine train_X and train_Y
+train_data <- cbind(train_X, train_Y)
+
+```
+
+## SVM
+```{r}
+ctrl <- trainControl(method = "cv", number = 5, verboseIter = TRUE, classProbs = TRUE)  
+
+tuned_svm <- train(train_Y ~ ., data = data.frame(train_X, train_Y),
+                   method = "svmRadial",  
+                   trControl = ctrl,
+                   preProcess = "scale",
+                   tuneLength = 3)
+
+# Predict using the tuned SVM model
+predictions_svm <- predict(tuned_svm, newdata = test_X)
+# Evaluation metrics
+confusion_matrix_svm <- confusionMatrix(predictions_svm, test_Y)
+roc_curve_svm <- roc(response = test_Y, predictor = as.numeric(predictions_svm))
+auc_svm <- auc(roc_curve_svm)
+
+# Output results
+print(confusion_matrix_svm)
+print(paste("AUC:", auc_svm))
+plot(roc_curve_svm, main="ROC Curve for SVM Model")
+
+```
+
+## Random Forest
+```{r}
+# Set seed for reproducibility
+set.seed(123)
+# Define cross-validation control
+ctrl <- trainControl(method = "cv", number = 5, verboseIter = TRUE)
+
+# Tune the random forest model
+tuned_rf <- train(train_Y ~ ., data = train_data, method = "rf",
+                  trControl = ctrl, tuneLength = 3)
+
+# Get the best model
+best_model <- tuned_rf$finalModel
+
+# Make predictions on the test set
+predictions <- predict(best_model, newdata = test_X)
+
+# Evaluate the model using various metrics
+confusion_matrix <- confusionMatrix(predictions, test_Y)
+roc_curve <- roc(test_Y, as.numeric(predictions))
+auc <- auc(roc_curve)
+
+# Print evaluation metrics
+print(confusion_matrix)
+print(paste("AUC:", auc))
+plot(roc_curve, main="ROC Curve for Random Forest", col = "blue", lwd = 2, print.auc = TRUE, print.auc.x = 0.6, print.auc.y = 0.4)
+
+
+library(pROC)
+
+# Compute AUC for each class separately
+auc_by_class <- lapply(levels(test_Y), function(class) {
+  class_predictions <- as.numeric(predictions == class)
+  class_actual <- as.numeric(test_Y == class)
+  roc_curve <- roc(class_actual, class_predictions)
+  auc <- auc(roc_curve)
+  
+  # Plot ROC curve for each class separately
+  plot(roc_curve, main = paste("ROC Curve for", class), col = "blue", lwd = 2,
+       print.auc = TRUE, print.auc.x = 0.6, print.auc.y = 0.4)
+  
+  return(auc)
+})
+
+# Print AUC for each class
+names(auc_by_class) <- levels(test_Y)
+print(auc_by_class)
+
+
+```
+
+## XGboost
+```{r}
+# Load necessary library
+library(xgboost)
+library(caret)
+library(pROC)
+
+# Convert the data to DMatrix object which is optimized for XGBoost
+dtrain <- xgb.DMatrix(data = as.matrix(train_X), label = as.numeric(train_Y) - 1)  
+dtest <- xgb.DMatrix(data = as.matrix(test_X), label = as.numeric(test_Y) - 1)
+
+# Set parameters for XGBoost
+
+param_grid = expand.grid(
+  booster = "gbtree",
+  objective = "multi:softprob",  
+  num_class = length(levels(factor(Y))),  
+  eval_metric = "mlogloss",  
+  
+  eta = seq(from = 0.01, to = 1, length.out = 10),  # Learning rate
+  max_depth = c(3, 6, 9),   # Depth of trees
+  #min_child_weight = c(1, 5, 10),  # Minimum sum of instance weight (hessian) needed in a child
+  min_child_weight = 5,
+  subsample = c(0.5, 0.75, 1),  # Subsample ratio of the training instances
+  #subsample = 0.5,
+  #colsample_bytree = c(0.5, 0.75, 1)  # Subsample ratio of columns when constructing each tree
+  colsample_bytree = 0.8
+)
+
+
+best_auc = 0
+best_params = NULL
+prediction = NULL
+
+# Loop over each row in the parameter grid
+for (i in 1:nrow(param_grid)) {
+    params <- list(
+    booster = "gbtree",
+    objective = "multi:softprob",   
+    num_class = 3,  
+    eval_metric = "mlogloss",  
+    eta = param_grid[i, "eta"],
+    max_depth =  param_grid[i, "max_depth"],
+    min_child_weight = param_grid[i, "min_child_weight"],
+    subsample = param_grid[i, "subsample"],
+    colsample_bytree = param_grid[i, "colsample_bytree"]
+  )
+    
+    nrounds <- 100
+
+# Train the model
+    xgb_model <- xgb.train(params = params, data = dtrain, nrounds = nrounds, 
+                       watchlist = list(eval = dtrain, test = dtest),                                          verbose = 1)
+    
+    
+    # Make predictions
+    predictions <- predict(xgb_model, newdata = dtest)
+    if (params$objective == "multi:softprob") {
+      max_prob_indices <- max.col(matrix(predictions, ncol = length(levels(factor(Y))), byrow = TRUE))  # Convert probabilities to class predictions for multiclass
+      predictions <- max_prob_indices - 1
+    }
+    
+    # Confusion Matrix and AUC calculation using caret and pROC
+    
+    
+    #conf_matrix <- confusionMatrix(as.factor(predictions), as.factor(as.numeric(test_Y) - 1))
+    
+    #conf_matrix$overall['Accuracy']
+    
+    roc_curve <- roc(as.numeric(test_Y) - 1, predictions, multi.class = "ovr")
+    auc_score <- auc(roc_curve)
+
+  
+  # Check if this is the best AUC
+  if (auc_score > best_auc) {
+    best_auc <- auc_score
+    best_params <- params
+    prediction <- predictions
+  }
+}
+
+
+# Output the best parameters
+print(paste("Best AUC:", best_auc))
+print("Best Parameters:")
+print(best_params)
+print(confusionMatrix(as.factor(prediction), as.factor(as.numeric(test_Y) - 1)))
+roc_curve <- roc(as.numeric(test_Y) - 1, prediction, multi.class = "ovr")
+plot(roc_curve, main="ROC Curve for XGboost")
+```
+```{r}
+confusion_matrix = confusionMatrix(as.factor(prediction), as.factor(as.numeric(test_Y) - 1))
+
+auc = roc(as.factor(as.numeric(test_Y) - 1), as.numeric(as.factor(prediction)))
+# Print evaluation metrics
+print(confusion_matrix)
+print(paste("AUC:", auc))
+plot(roc_curve, main="ROC Curve for XGboost", col = "blue", lwd = 2, print.auc = TRUE, print.auc.x = 0.6, print.auc.y = 0.4)
+
+
+auc_by_class <- lapply(levels(as.factor(as.numeric(test_Y) - 1)), function(class) {
+  class_predictions <- as.numeric(as.factor(prediction) == class)
+  class_actual <- as.numeric(as.factor(as.numeric(test_Y) - 1) == class)
+  roc_curve <- roc(class_actual, class_predictions)
+  auc <- auc(roc_curve)
+  
+  # Plot ROC curve for each class separately
+  plot(roc_curve, main = paste("ROC Curve for", class), col = "blue", lwd = 2,
+       print.auc = TRUE, print.auc.x = 0.6, print.auc.y = 0.4)
+  
+  return(auc)
+})
+
+# Print AUC for each class
+names(auc_by_class) <- levels(test_Y)
+print(auc_by_class)
+```
+
+
+# Ml model for Numeric 
+```{r}
+# Load required libraries
+library(randomForest)
+library(caret)
+library(pROC)
+
+#data <- read_excel("F:/Graduate/Project/output_results.xlsx")
+data <- read_excel(output_excel)
+# Exclude "Hispanic" and "Other" from race
+data <- subset(data, race != "Hispanic" & race != "Other")
+
+# Convert race to factor
+data$race <- factor(data$race, levels = c("White", "Asian", "AfricanAmer"))
+
+# Select relevant columns and remove missing values
+df <- data[, c(13:20, 24)]
+df <- na.omit(df)
+
+# Normalize only numeric columns
+numeric_cols <- sapply(df, is.numeric)
+df_normalized <- as.data.frame(lapply(df[, numeric_cols], function(x) (x - min(x)) / (max(x) - min(x))))
+
+# Combine normalized numeric columns with non-numeric columns
+df_normalized <- cbind(df[, !numeric_cols], df_normalized)
+
+# Separate predictors (X) and target variable (Y)
+X <- df_normalized[, 2:ncol(df_normalized)]  # Exclude the first column (race)
+Y <- df_normalized[, 1]
+
+# Set seed for reproducibility
+set.seed(123)
+
+# Create indices for the training set
+trainIndex <- sample(1:nrow(df), size = 0.8 * nrow(df))
+
+# Split the data into training and testing sets
+train_X <- X[trainIndex, ]
+test_X <- X[-trainIndex, ]
+train_Y <- Y[trainIndex]  # Corrected indexing
+test_Y <- Y[-trainIndex]  # Corrected indexing
+
+# Check the number of rows in each set
+nrow(train_X)
+nrow(test_X)
+
+# Combine train_X and train_Y
+train_data <- cbind(train_X, train_Y)
+
+```
+## SVM
+```{r}
+ctrl <- trainControl(method = "cv", number = 5, verboseIter = TRUE, classProbs = TRUE)  
+
+tuned_svm <- train(train_Y ~ ., data = data.frame(train_X, train_Y),
+                   method = "svmRadial",  
+                   trControl = ctrl,
+                   preProcess = "scale",
+                   tuneLength = 3)
+
+
+
+# Predict using the tuned SVM model
+predictions_svm <- predict(tuned_svm, newdata = test_X)
+# Evaluation metrics
+confusion_matrix_svm <- confusionMatrix(predictions_svm, test_Y)
+roc_curve_svm <- roc(response = test_Y, predictor = as.numeric(predictions_svm))
+auc_svm <- auc(roc_curve_svm)
+
+# Output results
+print(confusion_matrix_svm)
+print(paste("AUC:", auc_svm))
+plot(roc_curve_svm, main="ROC Curve for SVM Model")
+
+```
+```{r}
+auc_svm
+```
+
+## Random Forest
+```{r}
+# Set seed for reproducibility
+set.seed(123)
+# Define cross-validation control
+ctrl <- trainControl(method = "cv", number = 5, verboseIter = TRUE)
+
+# Tune the random forest model
+tuned_rf <- train(train_Y ~ ., data = train_data, method = "rf",
+                  trControl = ctrl, tuneLength = 3)
+
+# Get the best model
+best_model <- tuned_rf$finalModel
+
+# Make predictions on the test set
+predictions <- predict(best_model, newdata = test_X)
+
+# Evaluate the model using various metrics
+confusion_matrix <- confusionMatrix(predictions, test_Y)
+roc_curve <- roc(test_Y, as.numeric(predictions))
+auc <- auc(roc_curve)
+
+# Print evaluation metrics
+print(confusion_matrix)
+print(paste("AUC:", auc))
+plot(roc_curve, main="ROC Curve for Random Forest", col = "blue", lwd = 2, print.auc = TRUE, print.auc.x = 0.6, print.auc.y = 0.4)
+
+
+library(pROC)
+
+# Compute AUC for each class separately
+auc_by_class <- lapply(levels(test_Y), function(class) {
+  class_predictions <- as.numeric(predictions == class)
+  class_actual <- as.numeric(test_Y == class)
+  roc_curve <- roc(class_actual, class_predictions)
+  auc <- auc(roc_curve)
+  
+  # Plot ROC curve for each class separately
+  plot(roc_curve, main = paste("ROC Curve for", class), col = "blue", lwd = 2,
+       print.auc = TRUE, print.auc.x = 0.6, print.auc.y = 0.4)
+  
+  return(auc)
+})
+
+# Print AUC for each class
+names(auc_by_class) <- levels(test_Y)
+print(auc_by_class)
+
+
+```
+
+
+## XGboost
+```{r}
+# Load necessary library
+library(xgboost)
+library(caret)
+library(pROC)
+
+# Convert the data to DMatrix object which is optimized for XGBoost
+dtrain <- xgb.DMatrix(data = as.matrix(train_X), label = as.numeric(train_Y) - 1)  
+dtest <- xgb.DMatrix(data = as.matrix(test_X), label = as.numeric(test_Y) - 1)
+
+# Set parameters for XGBoost
+param_grid = expand.grid(
+  booster = "gbtree",
+  objective = "multi:softprob",  
+  num_class = 3,  
+  eval_metric = "mlogloss", 
+  
+  eta = seq(from = 0.01, to = 1, length.out = 10),  # Learning rate
+  max_depth = c(3, 6, 9),   # Depth of trees
+  #min_child_weight = c(1, 5, 10),  # Minimum sum of instance weight (hessian) needed in a child
+  min_child_weight = 5,
+  subsample = c(0.5, 0.75, 1),  # Subsample ratio of the training instances
+  #subsample = 0.5,
+  #colsample_bytree = c(0.5, 0.75, 1)  # Subsample ratio of columns when constructing each tree
+  colsample_bytree = 0.8
+)
+
+
+best_auc = 0
+best_params = NULL
+prediction = NULL
+
+# Loop over each row in the parameter grid
+for (i in 1:nrow(param_grid)) {
+    params <- list(
+    booster = "gbtree",
+    objective = "multi:softprob",  
+    num_class = 3,  
+    eval_metric = "mlogloss",  
+    eta = param_grid[i, "eta"],
+    max_depth =  param_grid[i, "max_depth"],
+    min_child_weight = param_grid[i, "min_child_weight"],
+    subsample = param_grid[i, "subsample"],
+    colsample_bytree = param_grid[i, "colsample_bytree"]
+  )
+    
+    nrounds <- 100
+
+# Train the model
+    xgb_model <- xgb.train(params = params, data = dtrain, nrounds = nrounds, 
+                       watchlist = list(eval = dtrain, test = dtest),                                          verbose = 1)
+    
+    
+    # Make predictions
+    predictions <- predict(xgb_model, newdata = dtest)
+    if (params$objective == "multi:softprob") {
+      max_prob_indices <- max.col(matrix(predictions, ncol = length(levels(factor(Y))), byrow = TRUE))  
+      predictions <- max_prob_indices - 1
+    }
+    
+    # Confusion Matrix and AUC calculation using caret and pROC
+    
+    
+    #conf_matrix <- confusionMatrix(as.factor(predictions), as.factor(as.numeric(test_Y) - 1))
+    
+    #conf_matrix$overall['Accuracy']
+    
+    roc_curve <- roc(as.numeric(test_Y) - 1, predictions, multi.class = "ovr")
+    auc_score <- auc(roc_curve)
+
+  
+  # Check if this is the best AUC
+  if (auc_score > best_auc) {
+    best_auc <- auc_score
+    best_params <- params
+    prediction <- predictions
+  }
+}
+
+# Output the best parameters
+print(paste("Best AUC:", best_auc))
+print("Best Parameters:")
+print(best_params)
+print(confusionMatrix(as.factor(prediction), as.factor(as.numeric(test_Y) - 1)))
+roc_curve <- roc(as.numeric(test_Y) - 1, prediction, multi.class = "ovr")
+plot(roc_curve, main="ROC Curve for XGboost")
+```
+```{r}
+
+confusion_matrix = confusionMatrix(as.factor(prediction), as.factor(as.numeric(test_Y) - 1))
+
+auc = roc(as.factor(as.numeric(test_Y) - 1), as.numeric(as.factor(prediction)))
+# Print evaluation metrics
+print(confusion_matrix)
+print(paste("AUC:", auc))
+plot(roc_curve, main="ROC Curve for XGboost", col = "blue", lwd = 2, print.auc = TRUE, print.auc.x = 0.6, print.auc.y = 0.4)
+
+
+auc_by_class <- lapply(levels(as.factor(as.numeric(test_Y) - 1)), function(class) {
+  class_predictions <- as.numeric(as.factor(prediction) == class)
+  class_actual <- as.numeric(as.factor(as.numeric(test_Y) - 1) == class)
+  roc_curve <- roc(class_actual, class_predictions)
+  auc <- auc(roc_curve)
+  
+  # Plot ROC curve for each class separately
+  plot(roc_curve, main = paste("ROC Curve for", class), col = "blue", lwd = 2,
+       print.auc = TRUE, print.auc.x = 0.6, print.auc.y = 0.4)
+  
+  return(auc)
+})
+
+# Print AUC for each class
+names(auc_by_class) <- levels(test_Y)
+print(auc_by_class)
+
+```
+
+
+
+```{r}
+# Evaluate the model using various metrics
+confusion_matrix <- confusionMatrix(prediction, test_Y)
+roc_curve <- roc(test_Y, as.numeric(predictions))
+auc <- auc(roc_curve)
+
+# Print evaluation metrics
+print(confusion_matrix)
+print(paste("AUC:", auc))
+plot(roc_curve, main="ROC Curve for Random Forest", col = "blue", lwd = 2, print.auc = TRUE, print.auc.x = 0.6, print.auc.y = 0.4)
+
+
+library(pROC)
+
+# Compute AUC for each class separately
+auc_by_class <- lapply(levels(test_Y), function(class) {
+  class_predictions <- as.numeric(predictions == class)
+  class_actual <- as.numeric(test_Y == class)
+  roc_curve <- roc(class_actual, class_predictions)
+  auc <- auc(roc_curve)
+  
+  # Plot ROC curve for each class separately
+  plot(roc_curve, main = paste("ROC Curve for", class), col = "blue", lwd = 2,
+       print.auc = TRUE, print.auc.x = 0.6, print.auc.y = 0.4)
+  
+  return(auc)
+})
+
+# Print AUC for each class
+names(auc_by_class) <- levels(test_Y)
+print(auc_by_class)
+```
+
+
+```{r}
+library(xgboost)
+library(caret)
+library(pROC)
+
+# Convert labels to a consistent factor across training and testing datasets
+levels_all <- sort(unique(c(train_Y, test_Y)))  # Gather all unique levels and sort them
+
+# Prepare training and testing data as DMatrix objects
+dtrain <- xgb.DMatrix(data = as.matrix(train_X), label = as.numeric(factor(train_Y, levels = levels_all)) - 1)
+dtest <- xgb.DMatrix(data = as.matrix(test_X), label = as.numeric(factor(test_Y, levels = levels_all)) - 1)
+
+# Parameters for XGBoost
+param_grid <- expand.grid(
+  eta = seq(from = 0.01, to = 1, length.out = 10),
+  max_depth = c(3, 6, 9),
+  min_child_weight = 5,
+  subsample = c(0.5, 0.75, 1),
+  colsample_bytree = 0.8
+)
+
+best_auc = 0
+best_params = NULL
+prediction = NULL
+
+# Loop over parameter grid
+for (i in 1:nrow(param_grid)) {
+  params <- list(
+    booster = "gbtree",
+    objective = "multi:softprob",
+    num_class = length(levels_all),
+    eval_metric = "mlogloss",
+    eta = param_grid[i, "eta"],
+    max_depth = param_grid[i, "max_depth"],
+    min_child_weight = param_grid[i, "min_child_weight"],
+    subsample = param_grid[i, "subsample"],
+    colsample_bytree = param_grid[i, "colsample_bytree"]
+  )
+
+  nrounds <- 100
+  watchlist <- list(train = dtrain, test = dtest)
+
+  # Train the model
+  xgb_model <- xgb.train(params = params, data = dtrain, nrounds = nrounds, 
+                         watchlist = watchlist, verbose = 1)
+
+  # Make predictions
+  predictions <- predict(xgb_model, newdata = dtest)
+  predictions_matrix <- matrix(predictions, ncol = length(levels_all), byrow = TRUE)
+  colnames(predictions_matrix) <- levels_all  # Set column names as sorted unique levels
+
+  # AUC Calculation with properly named predictors
+  response_factor <- factor(test_Y, levels = levels_all)
+  roc_result <- multiclass.roc(response = response_factor, predictor = predictions_matrix)
+
+  # Calculate overall AUC and per-class AUCs
+  overall_auc <- auc(roc_result)
+  aucs_per_class <- sapply(roc_result$rocs, function(x) auc(x))
+
+  # Update best model tracking
+  if (overall_auc > best_auc) {
+    best_auc <- overall_auc
+    best_params <- params
+    prediction <- predictions_matrix
+  }
+}
+
+# Print results
+print(paste("Best Overall AUC: ", best_auc))
+print("Best Parameters:")
+print(best_params)
+print("AUC for each class comparison:")
+print(aucs_per_class)
+
+
+```
+
+
+# ML model for Coeff
+```{r}
+# Load required libraries
+library(randomForest)
+library(caret)
+library(pROC)
+
+#data <- read_excel("F:/Graduate/Project/output_results.xlsx")
+data <- read_excel(output_excel)
+
+# Exclude "Hispanic" and "Other" from race
+data <- subset(data, race != "Hispanic" & race != "Other")
+
+# Convert race to factor
+data$race <- factor(data$race, levels = c("White", "Asian", "AfricanAmer"))
+
+# Select relevant columns and remove missing values
+df <- data[, c(2:12, 24)]
+df <- na.omit(df)
+
+# Normalize only numeric columns
+numeric_cols <- sapply(df, is.numeric)
+df_normalized <- as.data.frame(lapply(df[, numeric_cols], function(x) (x - min(x)) / (max(x) - min(x))))
+
+# Combine normalized numeric columns with non-numeric columns
+df_normalized <- cbind(df[, !numeric_cols], df_normalized)
+
+# Separate predictors (X) and target variable (Y)
+X <- df_normalized[, 2:ncol(df_normalized)]  # Exclude the first column (race)
+Y <- df_normalized[, 1]
+
+# Set seed for reproducibility
+set.seed(123)
+
+# Create indices for the training set
+trainIndex <- sample(1:nrow(df), size = 0.8 * nrow(df))
+
+# Split the data into training and testing sets
+train_X <- X[trainIndex, ]
+test_X <- X[-trainIndex, ]
+train_Y <- Y[trainIndex]  # Corrected indexing
+test_Y <- Y[-trainIndex]  # Corrected indexing
+
+# Check the number of rows in each set
+nrow(train_X)
+nrow(test_X)
+
+# Combine train_X and train_Y
+train_data <- cbind(train_X, train_Y)
+
+```
+## SVM
+```{r}
+ctrl <- trainControl(method = "cv", number = 5, verboseIter = TRUE, classProbs = TRUE)  
+
+tuned_svm <- train(train_Y ~ ., data = data.frame(train_X, train_Y),
+                   method = "svmRadial",  
+                   trControl = ctrl,
+                   preProcess = "scale",
+                   tuneLength = 3)
+
+# Predict using the tuned SVM model
+predictions_svm <- predict(tuned_svm, newdata = test_X)
+# Evaluation metrics
+confusion_matrix_svm <- confusionMatrix(predictions_svm, test_Y)
+roc_curve_svm <- roc(response = test_Y, predictor = as.numeric(predictions_svm))
+auc_svm <- auc(roc_curve_svm)
+
+# Output results
+print(confusion_matrix_svm)
+print(paste("AUC:", auc_svm))
+plot(roc_curve_svm, main="ROC Curve for SVM Model")
+```
+
+## Random Forest
+```{r}
+# Define cross-validation control
+ctrl <- trainControl(method = "cv", number = 5, verboseIter = TRUE)
+
+# Tune the random forest model
+tuned_rf <- train(train_Y ~ ., data = train_data, method = "rf",
+                  trControl = ctrl, tuneLength = 3)
+
+# Get the best model
+best_model <- tuned_rf$finalModel
+
+# Make predictions on the test set
+predictions <- predict(best_model, newdata = test_X)
+
+# Evaluate the model using various metrics
+# confusion_matrix <- confusionMatrix(predictions, test_Y)
+# roc_curve <- roc(test_Y, as.numeric(predictions))
+# auc <- auc(roc_curve)
+# 
+# # Print evaluation metrics
+# print(confusion_matrix)
+# print(paste("AUC:", auc))
+# plot(roc_curve, main="ROC Curve for Random Forest")
+
+
+#################
+# Evaluate the model using various metrics
+confusion_matrix <- confusionMatrix(predictions, test_Y)
+roc_curve <- roc(test_Y, as.numeric(predictions))
+auc <- auc(roc_curve)
+
+# Print evaluation metrics
+print(confusion_matrix)
+print(paste("AUC:", auc))
+plot(roc_curve, main="ROC Curve for Random Forest", col = "blue", lwd = 2, print.auc = TRUE, print.auc.x = 0.6, print.auc.y = 0.4)
+
+
+library(pROC)
+
+# Compute AUC for each class separately
+auc_by_class <- lapply(levels(test_Y), function(class) {
+  class_predictions <- as.numeric(predictions == class)
+  class_actual <- as.numeric(test_Y == class)
+  roc_curve <- roc(class_actual, class_predictions)
+  auc <- auc(roc_curve)
+  
+  # Plot ROC curve for each class separately
+  plot(roc_curve, main = paste("ROC Curve for", class), col = "blue", lwd = 2,
+       print.auc = TRUE, print.auc.x = 0.6, print.auc.y = 0.4)
+  
+  return(auc)
+})
+
+# Print AUC for each class
+names(auc_by_class) <- levels(test_Y)
+print(auc_by_class)
+
+```
+
+
+## XGboost
+```{r}
+# Load necessary library
+library(xgboost)
+library(caret)
+library(pROC)
+
+# Convert the data to DMatrix object which is optimized for XGBoost
+dtrain <- xgb.DMatrix(data = as.matrix(train_X), label = as.numeric(train_Y) - 1)  
+# Assuming your Y is a factor starting from 1
+dtest <- xgb.DMatrix(data = as.matrix(test_X), label = as.numeric(test_Y) - 1)
+
+# Set parameters for XGBoost
+
+param_grid = expand.grid(
+  booster = "gbtree",
+  objective = "multi:softprob",  
+  num_class = length(levels(factor(Y))),  
+  eval_metric = "mlogloss",  
+  
+  eta = seq(from = 0.01, to = 1, length.out = 10),  # Learning rate
+  max_depth = c(3, 6, 9),   # Depth of trees
+  #min_child_weight = c(1, 5, 10),  # Minimum sum of instance weight (hessian) needed in a child
+  min_child_weight = 5,
+  subsample = c(0.5, 0.75, 1),  
+  colsample_bytree = 0.8
+)
+
+
+best_auc = 0
+best_params = NULL
+prediction = NULL
+
+# Loop over each row in the parameter grid
+for (i in 1:nrow(param_grid)) {
+    params <- list(
+    booster = "gbtree",
+    objective = "multi:softprob",  
+    num_class = 3,  
+    eval_metric = "mlogloss",  
+    eta = param_grid[i, "eta"],
+    max_depth =  param_grid[i, "max_depth"],
+    min_child_weight = param_grid[i, "min_child_weight"],
+    subsample = param_grid[i, "subsample"],
+    colsample_bytree = param_grid[i, "colsample_bytree"]
+  )
+    
+    nrounds <- 100
+
+# Train the model
+    xgb_model <- xgb.train(params = params, data = dtrain, nrounds = nrounds, 
+                       watchlist = list(eval = dtrain, test = dtest),                                          verbose = 1)
+    
+    
+    # Make predictions
+    predictions <- predict(xgb_model, newdata = dtest)
+    if (params$objective == "multi:softprob") {
+      max_prob_indices <- max.col(matrix(predictions, ncol = length(levels(factor(Y))), byrow = TRUE))  
+      predictions <- max_prob_indices - 1
+    }
+    
+    # Confusion Matrix and AUC calculation using caret and pROC
+    
+    
+    #conf_matrix <- confusionMatrix(as.factor(predictions), as.factor(as.numeric(test_Y) - 1))
+    
+    #conf_matrix$overall['Accuracy']
+    
+    roc_curve <- roc(as.numeric(test_Y) - 1, predictions, multi.class = "ovr")
+    auc_score <- auc(roc_curve)
+
+  
+  # Check if this is the best AUC
+  if (auc_score > best_auc) {
+    best_auc <- auc_score
+    best_params <- params
+    prediction <- predictions
+  }
+}
+
+
+# Output the best parameters
+print(paste("Best AUC:", best_auc))
+print("Best Parameters:")
+print(best_params)
+print(confusionMatrix(as.factor(prediction), as.factor(as.numeric(test_Y) - 1)))
+
+roc_curve <- roc(as.numeric(test_Y) - 1, prediction, multi.class = "ovr")
+plot(roc_curve, main="ROC Curve for XGboost")
+```
+
+```{r}
+confusion_matrix = confusionMatrix(as.factor(prediction), as.factor(as.numeric(test_Y) - 1))
+
+auc = roc(as.factor(as.numeric(test_Y) - 1), as.numeric(as.factor(prediction)))
+# Print evaluation metrics
+print(confusion_matrix)
+print(paste("AUC:", auc))
+plot(roc_curve, main="ROC Curve for XGboost", col = "blue", lwd = 2, print.auc = TRUE, print.auc.x = 0.6, print.auc.y = 0.4)
+
+
+auc_by_class <- lapply(levels(as.factor(as.numeric(test_Y) - 1)), function(class) {
+  class_predictions <- as.numeric(as.factor(prediction) == class)
+  class_actual <- as.numeric(as.factor(as.numeric(test_Y) - 1) == class)
+  roc_curve <- roc(class_actual, class_predictions)
+  auc <- auc(roc_curve)
+  
+  # Plot ROC curve for each class separately
+  plot(roc_curve, main = paste("ROC Curve for", class), col = "blue", lwd = 2,
+       print.auc = TRUE, print.auc.x = 0.6, print.auc.y = 0.4)
+  
+  return(auc)
+})
+
+# Print AUC for each class
+names(auc_by_class) <- levels(test_Y)
+print(auc_by_class)
+```
+
+# Gradient Boosting Model
+##Spline Coefficient 
+```{r}
+library(xgboost)
+library(readxl)
+library(dplyr)
+library(caret)
+library(pROC)
+#data <- read_excel("/Users/zhangyanan/Desktop/Cornell/Spring 2024/STSCI 5999/output_results.xlsx")
+data <- read_excel(output_excel)
+ 
+# Exclude 'Other' and 'Hispanic' from the race column
+data <- filter(data, !race %in% c("Other", "Hispanic"))
+ 
+# Convert 'race' to a factor if it's not already
+data$race <- as.factor(data$race)
+ 
+# Normalize only numeric columns
+numeric_cols <- sapply(data, is.numeric)
+data_normalized <- as.data.frame(lapply(data[, numeric_cols], function(x) (x - min(x)) / (max(x) - min(x))))
+ 
+# Combine normalized numeric columns with non-numeric columns
+data_normalized <- cbind(data[, !numeric_cols], data_normalized)
+ 
+# Separate predictors (X) and target variable (Y)
+X <- data_normalized[, -which(names(data_normalized) == "race")]
+Y <- data_normalized$race
+ 
+# Split data into training and test sets
+set.seed(123)  # for reproducibility
+train_index <- createDataPartition(Y, p = 0.8, list = FALSE)
+train_data <- data_normalized[train_index, ]
+test_data <- data_normalized[-train_index, ]
+ 
+# Combine all predictors
+all_predictors <- c("Left_I", "Left_D1", "Left_D2", "Left_D3", 
+                    "Mid_I", "Mid_D1", "Mid_D2",
+                    "Right_I", "Right_D1", "Right_D2", "Right_D3")
+ 
+# Define a function to fit and evaluate a model
+fit_and_evaluate_model <- function(predictors) {
+  X_train <- model.matrix(~., data = train_data[, predictors])
+  X_test <- model.matrix(~., data = test_data[, predictors])
+  y_train <- as.integer(train_data$race) - 1
+  y_test <- as.integer(test_data$race) - 1
+ 
+  param <- list(max_depth = 3, eta = 0.1, silent = 1, nthread = 2,
+                num_class = length(levels(data$race)), objective = "multi:softprob")
+  model <- xgboost(data = X_train, label = y_train, params = param, nrounds = 100)
+  
+  # Predict on test set
+  y_pred <- predict(model, X_test)
+  y_pred_max <- max.col(matrix(y_pred, ncol = length(levels(data$race)), byrow = TRUE)) - 1
+  
+  # Calculate accuracy
+  accuracy <- mean(y_pred_max == y_test)
+  print(paste("Accuracy:", accuracy))
+}
+ 
+# Fit and evaluate the model using all predictors combined
+fit_and_evaluate_model(all_predictors)
+```
+```{r}
+#Further dive into ROC Curve For Each Specific Race
+
+predictors <- c("Left_I", "Left_D1", "Left_D2", "Left_D3", "Mid_I", "Mid_D1", "Mid_D2", "Right_I", "Right_D1", "Right_D2", "Right_D3")
+ 
+# Create model matrix for predictors
+X_train <- model.matrix(~., data = train_data[, predictors])
+X_test <- model.matrix(~., data = test_data[, predictors])
+y_train <- train_data$race
+y_test <- test_data$race
+ 
+# Fit xgboost model
+param <- list(max_depth = 3, eta = 0.1, silent = 1, nthread = 2,
+              num_class = length(levels(data$race)), objective = "multi:softprob")
+model <- xgboost(data = X_train, label = as.integer(y_train) - 1, params = param, nrounds = 100)
+ 
+# Predict on test set and calculate probabilities
+y_pred <- predict(model, X_test)
+y_pred_matrix <- matrix(y_pred, ncol = length(levels(data$race)), byrow = TRUE)
+ 
+# Plot ROC and calculate AUC for each class
+par(mfrow = c(2, 2))  
+auc_values <- numeric(length(levels(data$race)))  # initialize vector to store AUC values
+for (i in 1:length(levels(data$race))) {
+    roc_curve <- roc(response = as.numeric(y_test == levels(data$race)[i]),
+                     predictor = y_pred_matrix[, i],
+                     plot = TRUE, print.auc = TRUE,
+                     main = paste("ROC for", levels(data$race)[i]))
+    auc_values[i] <- auc(roc_curve)
+    print(paste("AUC for", levels(data$race)[i], ":", auc_values[i]))
+}
+```
+##numeric columns 
+```{r}
+#data <- read_excel("/Users/zhangyanan/Desktop/Cornell/Spring 2024/STSCI 5999/output_results.xlsx")
+data <- read_excel(output_excel)
+# Exclude unnecessary columns (e.g., comments, data points, curve)
+data <- select(data, -c(Comments, Data_Points, Curve))
+ 
+# Exclude 'Other' and 'Hispanic' from the race column
+data <- filter(data, !race %in% c("Other", "Hispanic"))
+ 
+# Convert 'race' to a factor
+data$race <- as.factor(data$race)
+ 
+# Check for NA values and remove or impute
+data <- na.omit(data)  # Removes all rows with any NA values
+ 
+# Define the predictors as specified
+predictors <- c("BMI", "Height", "Max.Hip", "Anterior-posterior.Length", "Depth", 
+                "Crotch.curve.length.at.back.waist", "Front.Crotch.(Left.side)", "Back.Crotch.(Right.Side)")
+ 
+# Normalize only numeric columns
+numeric_cols <- sapply(data[predictors], is.numeric)
+predictors_to_normalize <- predictors[numeric_cols]  # select only numeric predictors for normalization
+data_normalized <- data  # make a copy of data to retain non-numeric data intact
+data_normalized[predictors_to_normalize] <- scale(data[predictors_to_normalize])  # apply normalization
+ 
+# Split data into training and test sets
+set.seed(123) 
+train_index <- createDataPartition(data_normalized$race, p = 0.8, list = FALSE)
+train_data <- data_normalized[train_index, ]
+test_data <- data_normalized[-train_index, ]
+ 
+# Create model matrix for predictors
+X_train <- model.matrix(~., data = train_data[, predictors])
+X_test <- model.matrix(~., data = test_data[, predictors])
+y_train <- train_data$race
+y_test <- test_data$race
+ 
+# Fit xgboost model
+param <- list(max_depth = 3, eta = 0.1, silent = 1, nthread = 2,
+              num_class = length(levels(data$race)), objective = "multi:softprob")
+model <- xgboost(data = X_train, label = as.integer(y_train) - 1, params = param, nrounds = 100)
+ 
+# Predict on test set and calculate probabilities
+y_pred <- predict(model, X_test)
+y_pred_matrix <- matrix(y_pred, ncol = length(levels(data$race)), byrow = TRUE)
+ 
+# plot ROC and calculate AUC for each class
+par(mfrow = c(2, 2))  
+for (i in 1:length(levels(data$race))) {
+    roc_curve <- roc(response = as.numeric(y_test == levels(data$race)[i]),
+                     predictor = y_pred_matrix[, i],
+                     plot = TRUE, print.auc = TRUE,
+                     main = paste("ROC for", levels(data$race)[i]))
+    auc_value <- auc(roc_curve)
+    print(paste("AUC for", levels(data$race)[i], ":", auc_value))
+}
+# Calculate overall accuracy
+y_pred_labels <- max.col(y_pred_matrix)  # gets the index of the max probability for each row
+accuracy <- mean(y_pred_labels == as.integer(y_test))
+print(paste("Overall accuracy:", accuracy))
+```
+
+##Model Coefficient+ Numeric(Roc Curve over specific race )
+```{r}
+#data <- read_excel("/Users/zhangyanan/Desktop/Cornell/Spring 2024/STSCI 5999/output_results.xlsx")
+data <- read_excel(output_excel)
+# Exclude unnecessary columns (e.g., comments, data points, curve)
+data <- select(data, -c(Comments, Data_Points, Curve))
+ 
+# Exclude 'Other' and 'Hispanic' from the race column
+data <- filter(data, !race %in% c("Other", "Hispanic"))
+ 
+# Convert 'race' to a factor
+data$race <- as.factor(data$race)
+ 
+# Check for NA values and remove or impute
+data <- na.omit(data)  # Removes all rows with any NA values
+ 
+# Define the predictors as specified
+predictors <- c("Left_I","Left_D1",	"Left_D2","Left_D3","Mid_I", "Mid_D1","Mid_D2","Right_I","Right_D1","Right_D2", "Right_D3","BMI", "Height", "Max.Hip", "Anterior-posterior.Length", "Depth", "Crotch.curve.length.at.back.waist", "Front.Crotch.(Left.side)", "Back.Crotch.(Right.Side)")
+ 
+# Normalize only numeric columns
+numeric_cols <- sapply(data[predictors], is.numeric)
+predictors_to_normalize <- predictors[numeric_cols]  # select only numeric predictors for normalization
+data_normalized <- data  # make a copy of data to retain non-numeric data intact
+data_normalized[predictors_to_normalize] <- scale(data[predictors_to_normalize])  # apply normalization
+ 
+# Split data into training and test sets
+set.seed(123) 
+train_index <- createDataPartition(data_normalized$race, p = 0.8, list = FALSE)
+train_data <- data_normalized[train_index, ]
+test_data <- data_normalized[-train_index, ]
+ 
+# Create model matrix for predictors
+X_train <- model.matrix(~., data = train_data[, predictors])
+X_test <- model.matrix(~., data = test_data[, predictors])
+y_train <- train_data$race
+y_test <- test_data$race
+ 
+# Fit xgboost model
+param <- list(max_depth = 3, eta = 0.1, silent = 1, nthread = 2,
+              num_class = length(levels(data$race)), objective = "multi:softprob")
+model <- xgboost(data = X_train, label = as.integer(y_train) - 1, params = param, nrounds = 100)
+ 
+# Predict on test set and calculate probabilities
+y_pred <- predict(model, X_test)
+y_pred_matrix <- matrix(y_pred, ncol = length(levels(data$race)), byrow = TRUE)
+ 
+# Optionally plot ROC and calculate AUC for each class
+par(mfrow = c(2, 2))  # adjust depending on the number of classes
+for (i in 1:length(levels(data$race))) {
+    roc_curve <- roc(response = as.numeric(y_test == levels(data$race)[i]),
+                     predictor = y_pred_matrix[, i],
+                     plot = TRUE, print.auc = TRUE,
+                     main = paste("ROC for", levels(data$race)[i]))
+    auc_value <- auc(roc_curve)
+    print(paste("AUC for", levels(data$race)[i], ":", auc_value))
+}
+# Calculate overall accuracy
+y_pred_labels <- max.col(y_pred_matrix)  # gets the index of the max probability for each row
+accuracy <- mean(y_pred_labels == as.integer(y_test))
+print(paste("Overall accuracy:", accuracy))
+```
+##Roc Curve overall 
+```{r}
+predictors <- c("Left_I", "Left_D1", "Left_D2", "Left_D3", "Mid_I", "Mid_D1", "Mid_D2",
+                "Right_I", "Right_D1", "Right_D2", "Right_D3", "BMI", "Height", "Max.Hip",
+                "Anterior-posterior.Length", "Depth", "Crotch.curve.length.at.back.waist",
+                "Front.Crotch.(Left.side)", "Back.Crotch.(Right.Side)")
+ 
+# Create model matrix for predictors
+X_train <- model.matrix(~., data = train_data[, predictors])
+X_test <- model.matrix(~., data = test_data[, predictors])
+y_train <- as.numeric(train_data$race == "White")  # Binary conversion
+ 
+# Fit xgboost model for binary classification
+params <- list(max_depth = 3, eta = 0.1, verbosity = 0, nthread = 2, objective = "binary:logistic")
+model <- xgboost(data = X_train, label = y_train, params = params, nrounds = 100)
+ 
+# Predict on test set and calculate probabilities for the 'White' class
+predicted_probs <- predict(model, X_test)
+ 
+# Compute the ROC curve
+roc_obj <- roc(test_data$race == "White", predicted_probs)
+ 
+# Plot the ROC curve
+plot(roc_obj, main = "ROC Curve for Gradient Boosting (Both)", col = "blue", lwd = 2, print.auc = TRUE, print.auc.x = 0.6, print.auc.y = 0.4)
